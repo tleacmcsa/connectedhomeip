@@ -221,6 +221,7 @@ void WindowApp::DispatchEvent(const WindowApp::Event & event)
         break;
 
     case EventId::UpReleased:
+        StopMotor();
         mUpPressed = false;
         if (mLongPressTimer)
         {
@@ -255,6 +256,7 @@ void WindowApp::DispatchEvent(const WindowApp::Event & event)
         break;
 
     case EventId::DownReleased:
+        StopMotor();
         mDownPressed = false;
         if (mLongPressTimer)
         {

@@ -42,6 +42,21 @@
 SilabsLCD slLCD;
 #endif
 
+#include "em_gpio.h"
+#ifdef OLD_H_BRDIGE
+#define ENABLE_PORT gpioPortD
+#define ENABLE_PIN 10
+#define DIRECTION_PORT gpioPortD
+#define DIRECTION_PIN 11
+#else
+#define FORWARD_PORT gpioPortA
+#define FORWARD_PIN 8
+#define REVERSE_PORT gpioPortA
+#define REVERSE_PIN 9
+#endif
+
+#define MOTOR_DISABLE_TIMEOUT 25000
+
 #define APP_TASK_STACK_SIZE (4096)
 #define APP_TASK_PRIORITY 2
 #define APP_EVENT_QUEUE_SIZE 10
@@ -206,6 +221,21 @@ CHIP_ERROR WindowAppImpl::Init()
     slLCD.Init();
 #endif
 
+    // Configure the GPIOs for the h-bridge
+#ifdef OLD_H_BRDIGE
+    GPIO_PinModeSet(ENABLE_PORT, ENABLE_PIN, gpioModePushPull, 1);
+    GPIO_PinModeSet(DIRECTION_PORT, DIRECTION_PIN, gpioModePushPull, 1);
+    GPIO_PinOutClear(ENABLE_PORT, ENABLE_PIN);
+    GPIO_PinOutClear(DIRECTION_PORT, DIRECTION_PIN);
+#else
+    GPIO_PinModeSet(FORWARD_PORT, FORWARD_PIN, gpioModePushPull, 1);
+    GPIO_PinModeSet(REVERSE_PORT, REVERSE_PIN, gpioModePushPull, 1);
+    GPIO_PinOutClear(FORWARD_PORT, FORWARD_PIN);
+    GPIO_PinOutClear(REVERSE_PORT, REVERSE_PIN);
+#endif
+
+    mMotorDisableTimer = CreateTimer("Timer:MotorDisable", MOTOR_DISABLE_TIMEOUT, OnMotorLiftDisableTimeout, this);
+
     return CHIP_NO_ERROR;
 }
 
@@ -298,6 +328,7 @@ void WindowAppImpl::DispatchEventAttributeChange(chip::EndpointId endpoint, chip
     case Attributes::CurrentPositionLiftPercent100ths::Id:
     case Attributes::CurrentPositionTiltPercent100ths::Id:
         UpdateLCD();
+        ControlMotor();
         break;
     /* ### ATTRIBUTEs CHANGEs IGNORED ### */
     /* RO EndProductType: not supposed to dynamically change */
@@ -425,6 +456,73 @@ void WindowAppImpl::UpdateLEDs()
         {
             mActionLED.Blink(1000);
         }
+    }
+}
+
+void WindowAppImpl::ControlMotor()
+{
+    Cover & cover = GetCover();
+    NPercent100ths current;
+
+    chip::DeviceLayer::PlatformMgr().LockChipStack();
+    Attributes::CurrentPositionLiftPercent100ths::Get(cover.mEndpoint, current);
+    chip::DeviceLayer::PlatformMgr().UnlockChipStack();
+
+    if (!current.IsNull())
+    {
+        // Stop any timer we had to disable the motor
+        mMotorDisableTimer->Stop();
+
+        // turn the thing off since we might switch polarity
+        StopMotor();
+
+        // if the curent value is 0 lets call that 'closing', otherwise we are 'opening'
+        if (current.Value() == 0)
+        {
+            EFR32_LOG("TCL: closing");
+#ifdef OLD_H_BRDIGE
+            GPIO_PinOutClear(DIRECTION_PORT, DIRECTION_PIN);
+#else
+            GPIO_PinOutSet(FORWARD_PORT, FORWARD_PIN);
+#endif
+        }
+        else
+        {
+            EFR32_LOG("TCL: opening");
+#ifdef OLD_H_BRDIGE
+            GPIO_PinOutSet(DIRECTION_PORT, DIRECTION_PIN);
+#else
+            GPIO_PinOutSet(REVERSE_PORT, REVERSE_PIN);
+#endif
+        }
+
+#ifdef OLD_H_BRDIGE
+        // turn on the motor
+        GPIO_PinOutSet(ENABLE_PORT, ENABLE_PIN);
+#endif
+
+        // start a timer to stop the motor 'soon'
+        mMotorDisableTimer->Start();
+    }
+}
+
+void WindowAppImpl::StopMotor()
+{
+    EFR32_LOG("TCL: stopping motor");
+#ifdef OLD_H_BRDIGE
+    GPIO_PinOutClear(ENABLE_PORT, ENABLE_PIN);
+#else
+    GPIO_PinOutClear(FORWARD_PORT, FORWARD_PIN);
+    GPIO_PinOutClear(REVERSE_PORT, REVERSE_PIN);
+#endif
+}
+
+void WindowAppImpl::OnMotorLiftDisableTimeout(WindowApp::Timer & timer)
+{
+    WindowAppImpl * app = static_cast<WindowAppImpl *>(timer.mContext);
+    if (app != nullptr)
+    {
+        app->StopMotor();
     }
 }
 

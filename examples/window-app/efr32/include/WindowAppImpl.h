@@ -70,8 +70,11 @@ protected:
     void DispatchEvent(const WindowApp::Event & event) override;
     void UpdateLEDs();
     void UpdateLCD();
+    void ControlMotor();
     void OnMainLoop() override;
+    void StopMotor() override;
 
+    static void OnMotorLiftDisableTimeout(WindowApp::Timer & timer);
     static void OnTaskCallback(void * parameter);
     static void OnIconTimeout(WindowApp::Timer & timer);
 
@@ -81,6 +84,8 @@ private:
     QueueHandle_t mQueue = nullptr;
     LEDWidget mStatusLED;
     LEDWidget mActionLED;
+
+    WindowApp::Timer * mMotorDisableTimer = nullptr;
 
     // Get QR Code and emulate its content using NFC tag
     char mQRCodeBuffer[chip::QRCodeBasicSetupPayloadGenerator::kMaxQRCodeBase38RepresentationLength + 1];
