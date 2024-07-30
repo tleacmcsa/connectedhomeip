@@ -31,6 +31,7 @@
 #include <app/TestEventTriggerDelegate.h>
 #include <app/server/AclStorage.h>
 #include <app/server/AppDelegate.h>
+#include <app/server/ArlStorage.h>
 #include <app/server/CommissioningWindowManager.h>
 #include <app/server/DefaultAclStorage.h>
 #include <credentials/CertificateValidityPolicy.h>
@@ -128,7 +129,7 @@ struct ServerInitParams
     ServerInitParams() = default;
 
     // Not copyable
-    ServerInitParams(const ServerInitParams &)             = delete;
+    ServerInitParams(const ServerInitParams &) = delete;
     ServerInitParams & operator=(const ServerInitParams &) = delete;
 
     // Application delegate to handle some commissioning lifecycle events
@@ -163,6 +164,16 @@ struct ServerInitParams
     // ACL storage: MUST be injected. Used to store ACL entries in persistent storage. Must NOT
     // be initialized before being provided.
     app::AclStorage * aclStorage = nullptr;
+
+#if CHIP_CONFIG_USE_ACCESS_RESTRICTIONS
+    // Access Restriction implementation: MUST be injected if MNGD feature enabled. Used to enforce
+    // access restrictions that are managed by the device.
+    Access::AccessRestriction *accessRestriction = nullptr;
+    // ARL storage: MUST be injected if MNGD feature enabled. Used to store ACL entries in
+    // persistent storage. Must NOT be initialized before being provided.
+    app::ArlStorage * arlStorage = nullptr;
+#endif
+
     // Network native params can be injected depending on the
     // selected Endpoint implementation
     void * endpointNativeParams = nullptr;
@@ -213,7 +224,7 @@ struct CommonCaseDeviceServerInitParams : public ServerInitParams
     CommonCaseDeviceServerInitParams() = default;
 
     // Not copyable
-    CommonCaseDeviceServerInitParams(const CommonCaseDeviceServerInitParams &)             = delete;
+    CommonCaseDeviceServerInitParams(const CommonCaseDeviceServerInitParams &) = delete;
     CommonCaseDeviceServerInitParams & operator=(const CommonCaseDeviceServerInitParams &) = delete;
 
     /**
@@ -678,6 +689,8 @@ private:
 
     Access::AccessControl mAccessControl;
     app::AclStorage * mAclStorage;
+    Access::AccessRestriction * mAccessRestriction;
+    app::ArlStorage * mArlStorage;
 
     TestEventTriggerDelegate * mTestEventTriggerDelegate;
     Crypto::OperationalKeystore * mOperationalKeystore;

@@ -516,8 +516,7 @@ CHIP_ERROR InteractionModelEngine::ParseAttributePaths(const Access::SubjectDesc
                                                  .requestType = Access::RequestType::kAttributeReadRequest,
                                                  .entityId    = paramsList.mValue.mAttributeId };
 
-                err = Access::GetAccessControl().Check(aSubjectDescriptor, requestPath,
-                                                       RequiredPrivilege::ForReadAttribute(concretePath));
+                err = Access::GetAccessControl().Check(aSubjectDescriptor, requestPath, RequiredPrivilege::ForReadAttribute(concretePath));
                 if (err == CHIP_NO_ERROR)
                 {
                     aHasValidAttributePath = true;
